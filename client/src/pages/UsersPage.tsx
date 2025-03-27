@@ -45,6 +45,13 @@ export default function UsersPage() {
 
     fetchUsers();
   }, [currentPage, setTotalPages, toast]);
+  
+  // Update local user state when a user is edited
+  const updateLocalUser = (updatedUser: User) => {
+    setUsers(prevUsers => 
+      prevUsers.map(user => user.id === updatedUser.id ? updatedUser : user)
+    );
+  };
 
   // Filter users based on search query
   useEffect(() => {
@@ -133,6 +140,17 @@ export default function UsersPage() {
         user={selectedUser}
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
+        onUpdate={(updatedUser) => {
+          // Update both the users and filteredUsers arrays
+          setUsers(prev => 
+            prev.map(user => user.id === updatedUser.id ? updatedUser : user)
+          );
+          
+          // Also manually update filteredUsers to ensure UI is updated immediately
+          setFilteredUsers(prev => 
+            prev.map(user => user.id === updatedUser.id ? updatedUser : user)
+          );
+        }}
       />
       
       <DeleteConfirmation

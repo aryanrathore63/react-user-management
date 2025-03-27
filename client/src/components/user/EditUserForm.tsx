@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +28,7 @@ interface EditUserFormProps {
   user: User | null;
   isOpen: boolean;
   onClose: () => void;
+  onUpdate?: (updatedUser: User) => void;
 }
 
 const userSchema = z.object({
@@ -38,7 +39,7 @@ const userSchema = z.object({
 
 type FormValues = z.infer<typeof userSchema>;
 
-export default function EditUserForm({ user, isOpen, onClose }: EditUserFormProps) {
+export default function EditUserForm({ user, isOpen, onClose, onUpdate }: EditUserFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -52,7 +53,7 @@ export default function EditUserForm({ user, isOpen, onClose }: EditUserFormProp
   });
 
   // Update form values when user changes
-  useState(() => {
+  useEffect(() => {
     if (user) {
       form.reset({
         first_name: user.first_name,
@@ -60,15 +61,45 @@ export default function EditUserForm({ user, isOpen, onClose }: EditUserFormProp
         email: user.email,
       });
     }
-  });
+  }, [user, form]);
 
   const onSubmit = async (data: FormValues) => {
     if (!user) return;
     
     setIsSubmitting(true);
     try {
+      // Make the API call to update the user
       await updateUser(user.id, data);
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      
+      // Create an updated user object with the new data
+      const updatedUserInfo = {
+        ...user,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email
+      };
+      
+      // Call the onUpdate callback if provided
+      if (onUpdate) {
+        onUpdate(updatedUserInfo);
+      }
+      
+      // Update users in the query cache 
+      queryClient.setQueriesData({ queryKey: ['users'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        
+        // Update user in the data array
+        return {
+          ...oldData,
+          data: oldData.data.map((u: User) => 
+            u.id === user.id ? updatedUserInfo : u
+          )
+        };
+      });
+      
+      // Also trigger a refresh of the user data from the server
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      
       toast({
         title: "User updated",
         description: "User information has been updated successfully.",
